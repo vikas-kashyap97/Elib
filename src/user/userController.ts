@@ -49,11 +49,11 @@ const createUser = async (req: Request, res: Response, next: NextFunction) => {
     });
 
     // response
-    res.json({ accessToken: token });
+    res.status(201).json({ accessToken: token });
   } catch (err) {
     console.error("Error while generating JWT Tokens:", err);
     return next(createHttpError(500, "Error while generating JWT Tokens."));
   }
 };
 
-export { createUser };
+export { createUser, loginUser };

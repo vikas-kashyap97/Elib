@@ -12,6 +12,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/users", userRouter);
+
 // Global error handler
 
 app.use(globalErrorHandler);
