@@ -142,6 +142,7 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
     // ---- UPDATE COVER IMAGE (if provided) ----
     let updatedCoverUrl = book.coverImage;
     if (files?.coverImage?.[0]) {
+      // upload new cover
       const coverFile = files.coverImage[0];
       const coverFileName = coverFile.filename;
       const conveImageMimeType = coverFile.mimetype.split("/").at(-1);
@@ -181,6 +182,14 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
 
       updatedCoverUrl = coverUploadResult.secure_url;
 
+      // delete old cover from cloudinary
+      const coverFileSplits = book.coverImage.split("/");
+      const oldCoverPublicId =
+        coverFileSplits.at(-2) +
+        "/" +
+        coverFileSplits.at(-1)?.split(".").at(-2);
+      await cloudinary.uploader.destroy(oldCoverPublicId);
+
       await fs.promises.unlink(coverFilePath);
     }
 
@@ -206,6 +215,14 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
       );
 
       updatedBookFileUrl = bookFileUploadResult.secure_url;
+
+      // delete old book file from cloudinary
+      const bookFileSplits = book.file.split("/");
+      const oldBookPublicId =
+        bookFileSplits.at(-2) + "/" + bookFileSplits.at(-1);
+      await cloudinary.uploader.destroy(oldBookPublicId, {
+        resource_type: "raw",
+      });
 
       await fs.promises.unlink(bookFilePath);
     }
@@ -258,37 +275,42 @@ const getSingleBook = async (
 };
 
 const deleteBook = async (req: Request, res: Response, next: NextFunction) => {
-  const { bookId } = req.params;
-  const book = await bookModel.findOne({ _id: bookId });
-  const _req = req as AuthRequest;
+  try {
+    const { bookId } = req.params;
+    const book = await bookModel.findOne({ _id: bookId });
+    const _req = req as AuthRequest;
 
-  if (!book) {
-    return next(createHttpError(404, "Book not found"));
+    if (!book) {
+      return next(createHttpError(404, "Book not found"));
+    }
+
+    // check access
+    if (book.author.toString() !== _req.userId) {
+      return next(createHttpError(403, "Unauthorized"));
+    }
+
+    // cover image publicId
+    const coverFileSplits = book.coverImage.split("/");
+    const coverImagePublicId =
+      coverFileSplits.at(-2) + "/" + coverFileSplits.at(-1)?.split(".").at(-2);
+
+    // book file publicId (fix here)
+    const bookFileSplits = book.file.split("/");
+    const bookFilePublicId =
+      bookFileSplits.at(-2) + "/" + bookFileSplits.at(-1)?.split(".").at(-2);
+
+    // delete both from cloudinary
+    await cloudinary.uploader.destroy(coverImagePublicId);
+    await cloudinary.uploader.destroy(bookFilePublicId, {
+      resource_type: "raw",
+    });
+
+    // delete DB record
+    await bookModel.deleteOne({ _id: bookId });
+    return res.sendStatus(204);
+  } catch (err) {
+    next(err);
   }
-  // check access
-  if (book.author.toString() !== _req.userId) {
-    return next(createHttpError(403, "Unauthorized"));
-  }
-  // book-covers/31694929b12c3932b45e9cf880fef34d
-  // https://res.cloudinary.com/decxcskz2/image/upload/v1758174871/book-covers/25a6c963d99f122b8dca7bcea90fbff9.jpg
-  // https://res.cloudinary.com/decxcskz2/raw/upload/v1758174874/book-pdfs/60f0fa04d000a16246a9b3cabbe72a24.pdf
-
-  const coverFileSplits = book.coverImage.split("/");
-  const coverImagePublicId =
-    coverFileSplits.at(-2) + "/" + coverFileSplits.at(-1)?.split(".").at(-2);
-  console.log(coverImagePublicId);
-
-  const bookFileSplits = book.file.split("/");
-  const bookFilePublicId = bookFileSplits.at(-2) + "/" + coverFileSplits.at(-1);
-  console.log(bookFilePublicId);
-
-  await cloudinary.uploader.destroy(coverImagePublicId);
-  await cloudinary.uploader.destroy(bookFilePublicId, {
-    resource_type: "raw",
-  });
-
-  await bookModel.deleteOne({ _id: bookId });
-  return res.sendStatus(204);
 };
 
 export { createBook, updateBook, listBooks, getSingleBook, deleteBook };
