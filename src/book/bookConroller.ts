@@ -227,4 +227,16 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
-export { createBook, updateBook };
+const ListBooks = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // You can add pagination here becuase in the production system we use pagination not find()
+    const book = await bookModel.find();
+
+    res.json(book);
+  } catch (err) {
+    console.log(err);
+    return next(createHttpError(500, "Error while getting the book"));
+  }
+};
+
+export { createBook, updateBook, ListBooks };
