@@ -2,8 +2,9 @@ import express from "express";
 import {
   createBook,
   updateBook,
-  ListBooks,
+  listBooks,
   getSingleBook,
+  deleteBook,
 } from "./bookConroller";
 import multer from "multer";
 import path from "node:path";
@@ -36,7 +37,8 @@ bookRouter.patch(
   updateBook
 );
 
-bookRouter.get("/", ListBooks);
+bookRouter.get("/", listBooks);
 bookRouter.get("/:bookId", getSingleBook);
+bookRouter.delete("/:bookId", authenticate, deleteBook);
 
 export default bookRouter;
